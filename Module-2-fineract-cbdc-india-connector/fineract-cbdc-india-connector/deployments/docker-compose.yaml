@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cbdc
+      POSTGRES_PASSWORD: cbdc
+      POSTGRES_DB: cbdc
+    ports:
+      - "5432:5432"
+    # Schema is created automatically by the connector on startup (it runs
+    # migrations), so no init SQL mount is needed here.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cbdc"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  connector:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: "8080"
+      CBDC_BASE_URL: "https://sandbox.sponsor-bank.example/ecbdc"
+      CBDC_AUTH_MODE: "apikey"
+      CBDC_API_KEY: "replace-me"
+      DATABASE_DSN: "postgres://cbdc:cbdc@postgres:5432/cbdc?sslmode=disable"
+      LOG_LEVEL: "info"
+    ports:
+      - "8080:8080"

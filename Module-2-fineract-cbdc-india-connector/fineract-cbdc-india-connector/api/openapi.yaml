@@ -1,0 +1,189 @@
+openapi: 3.0.3
+info:
+  title: Fineract CBDC India Connector
+  description: >
+    Connects Apache Fineract to the Indian CBDC (e₹) via a sponsor-bank API.
+    Exposes the standard connector operations: issue, transfer, lock, burn,
+    redeem, plus balance and status queries.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local
+tags:
+  - name: operations
+  - name: queries
+  - name: health
+paths:
+  /api/v1/issue:
+    post:
+      tags: [operations]
+      summary: Issue (mint) CBDC into a wallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IssueRequest' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OperationResult' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+  /api/v1/transfer:
+    post:
+      tags: [operations]
+      summary: Transfer CBDC between wallets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TransferRequest' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OperationResult' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+  /api/v1/lock:
+    post:
+      tags: [operations]
+      summary: Lock (reserve) CBDC in a wallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AmountRequest' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OperationResult' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+  /api/v1/burn:
+    post:
+      tags: [operations]
+      summary: Burn (destroy) CBDC
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AmountRequest' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OperationResult' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+  /api/v1/redeem:
+    post:
+      tags: [operations]
+      summary: Redeem CBDC back to commercial bank money
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AmountRequest' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/OperationResult' } } } }
+        '400': { $ref: '#/components/responses/Error' }
+  /api/v1/wallets/{walletID}/balance:
+    get:
+      tags: [queries]
+      summary: Get wallet balance
+      parameters:
+        - name: walletID
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Balance' } } } }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/transactions/{id}/status:
+    get:
+      tags: [queries]
+      summary: Get upstream transaction status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Status' } } } }
+  /api/v1/transactions/{id}:
+    get:
+      tags: [queries]
+      summary: Get a persisted transaction by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: OK }
+        '404': { $ref: '#/components/responses/Error' }
+  /healthz:
+    get:
+      tags: [health]
+      summary: Liveness probe
+      responses: { '200': { description: OK } }
+  /readyz:
+    get:
+      tags: [health]
+      summary: Readiness probe (checks sponsor bank + DB)
+      responses:
+        '200': { description: Ready }
+        '503': { description: Degraded }
+  /metrics:
+    get:
+      tags: [health]
+      summary: Prometheus metrics
+      responses: { '200': { description: OK } }
+components:
+  schemas:
+    IssueRequest:
+      type: object
+      required: [wallet_id, amount, currency, reference_id]
+      properties:
+        wallet_id: { type: string }
+        amount: { type: string, example: "100.50" }
+        currency: { type: string, example: "INR" }
+        reference_id: { type: string, format: uuid }
+    TransferRequest:
+      type: object
+      required: [source_wallet, destination_wallet, amount, currency, reference_id]
+      properties:
+        source_wallet: { type: string }
+        destination_wallet: { type: string }
+        amount: { type: string }
+        currency: { type: string }
+        reference_id: { type: string, format: uuid }
+    AmountRequest:
+      type: object
+      required: [wallet_id, amount, currency, reference_id]
+      properties:
+        wallet_id: { type: string }
+        amount: { type: string }
+        currency: { type: string }
+        reference_id: { type: string, format: uuid }
+    OperationResult:
+      type: object
+      properties:
+        upstream_tx_id: { type: string }
+        status: { type: string }
+        message: { type: string }
+    Balance:
+      type: object
+      properties:
+        wallet_id: { type: string }
+        available: { type: string }
+        locked: { type: string }
+        currency: { type: string }
+    Status:
+      type: object
+      properties:
+        upstream_tx_id: { type: string }
+        status: { type: string }
+    ErrorBody:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorBody' }

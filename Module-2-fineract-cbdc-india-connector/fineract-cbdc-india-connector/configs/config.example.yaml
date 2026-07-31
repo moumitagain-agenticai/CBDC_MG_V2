@@ -1,0 +1,38 @@
+# fineract-cbdc-india-connector — example configuration.
+# Copy to configs/config.yaml and adjust. Secrets should be supplied via
+# environment variables (see .env.example), NOT committed here.
+
+server:
+  port: 8080
+  read_timeout: 10s
+  write_timeout: 15s
+  shutdown_timeout: 20s
+  rate_limit_per_min: 120
+
+cbdc:
+  # Sponsor-bank e₹ API base URL (override with CBDC_BASE_URL).
+  base_url: "https://sandbox.sponsor-bank.example/ecbdc"
+  # auth_mode: apikey | oauth2 | mtls
+  auth_mode: "apikey"
+  # For apikey mode (override with CBDC_API_KEY):
+  api_key: "replace-me"
+  # For oauth2 mode:
+  oauth_token_url: ""
+  client_id: ""
+  client_secret: ""
+  timeout: 8s
+  max_retries: 3
+  breaker_max_requests: 5
+  breaker_name: "cbdc-sponsor-bank"
+
+database:
+  # Set enabled: true and provide a DSN to persist the transaction audit trail.
+  enabled: false
+  dsn: "postgres://cbdc:cbdc@localhost:5432/cbdc?sslmode=disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 30m
+
+log:
+  level: "info"   # debug | info | warn | error
+  json: true
