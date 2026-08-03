@@ -1,0 +1,36 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cbdc
+      POSTGRES_PASSWORD: cbdc
+      POSTGRES_DB: cbdc
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cbdc"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  bridge:
+    build:
+      context: ..
+      dockerfile: deployments/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: "8080"
+      SOURCE_LEDGER_NAME: "corda-uae"
+      SOURCE_BASE_URL: "http://cacti-connector-source:4000"
+      SOURCE_AUTH_MODE: "apikey"
+      SOURCE_API_KEY: "replace-me"
+      DEST_LEDGER_NAME: "besu-eu"
+      DEST_BASE_URL: "http://cacti-connector-dest:4000"
+      DEST_AUTH_MODE: "apikey"
+      DEST_API_KEY: "replace-me"
+      DATABASE_DSN: "postgres://cbdc:cbdc@postgres:5432/cbdc?sslmode=disable"
+      LOG_LEVEL: "info"
+    ports:
+      - "8080:8080"

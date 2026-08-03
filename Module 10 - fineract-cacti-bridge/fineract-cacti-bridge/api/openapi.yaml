@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: Fineract Cacti Bridge API
+  version: 1.0.0
+  description: >
+    Cross-chain CBDC settlement coordinator. Drives a durable lock-release-burn
+    saga across two Hyperledger Cacti ledger connectors, with compensation,
+    explicit rollback, and crash recovery.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/v1/settlements:
+    post:
+      summary: Initiate a cross-chain settlement
+      description: >
+        Runs the lock-release-burn saga to completion. Idempotent on
+        reference_id: repeating a reference returns the existing settlement.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SettleRequest' }
+      responses:
+        '201':
+          description: Settlement processed (see status for the outcome)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transfer' }
+        '200':
+          description: Attempted but failed at lock (status=FAILED)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transfer' }
+        '400': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /api/v1/settlements/{id}:
+    get:
+      summary: Fetch a settlement by id
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The settlement
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transfer' }
+        '404': { $ref: '#/components/responses/Error' }
+  /api/v1/settlements/{id}/rollback:
+    post:
+      summary: Compensate (roll back) an in-flight settlement
+      description: >
+        Only possible before the value is released on the destination. Returns
+        409 if the settlement is already RELEASED or BURNED.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Rolled back (status=COMPENSATED or FAILED)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Transfer' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses: { '200': { description: alive } }
+  /readyz:
+    get:
+      summary: Readiness probe (pings both connectors and the repository)
+      responses:
+        '200': { description: ready }
+        '503': { description: degraded }
+  /metrics:
+    get:
+      summary: Prometheus metrics
+      responses: { '200': { description: metrics exposition } }
+components:
+  schemas:
+    SettleRequest:
+      type: object
+      required: [reference_id, amount, asset, source_ledger, dest_ledger, sender, recipient]
+      properties:
+        reference_id: { type: string, description: Client idempotency key }
+        amount: { type: string, example: "100.00" }
+        asset: { type: string, example: "eAED" }
+        source_ledger: { type: string, example: "corda-uae" }
+        dest_ledger: { type: string, example: "besu-eu" }
+        sender: { type: string }
+        recipient: { type: string }
+    Transfer:
+      type: object
+      properties:
+        id: { type: string }
+        reference_id: { type: string }
+        status:
+          type: string
+          enum: [INITIATED, LOCKED, RELEASED, BURNED, COMPENSATING, COMPENSATED, FAILED]
+        amount: { type: string }
+        asset: { type: string }
+        source_ledger: { type: string }
+        dest_ledger: { type: string }
+        sender: { type: string }
+        recipient: { type: string }
+        lock_tx_id: { type: string }
+        release_tx_id: { type: string }
+        burn_tx_id: { type: string }
+        unlock_tx_id: { type: string }
+        burn_attempts: { type: integer }
+        failure_reason: { type: string }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code: { type: string }
+            message: { type: string }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }

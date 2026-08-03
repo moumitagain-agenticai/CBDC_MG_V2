@@ -1,0 +1,46 @@
+# fineract-cacti-bridge — example configuration.
+# Copy to configs/config.yaml and adjust. Secrets should come from env.
+
+server:
+  port: 8080
+  read_timeout: 10s
+  write_timeout: 15s
+  shutdown_timeout: 20s
+  rate_limit_per_min: 120
+
+# Two Hyperledger Cacti ledger connectors coordinated by the saga.
+ledgers:
+  source:                         # value is locked here, then burned
+    name: "corda-uae"
+    base_url: "http://cacti-connector-source:4000"
+    auth_mode: "apikey"           # apikey | oauth2 | mtls
+    api_key: "replace-me"
+    timeout: 10s
+    max_retries: 3
+    breaker_max_requests: 5
+    breaker_name: "source-connector"
+  dest:                           # value is released (credited) here
+    name: "besu-eu"
+    base_url: "http://cacti-connector-dest:4000"
+    auth_mode: "apikey"
+    api_key: "replace-me"
+    timeout: 10s
+    max_retries: 3
+    breaker_max_requests: 5
+    breaker_name: "dest-connector"
+
+settlement:
+  burn_max_attempts: 4            # per invocation; recovery gets a fresh budget
+  step_timeout: 15s
+  recover_on_startup: true        # resume in-flight sagas after a crash
+
+database:
+  enabled: false                  # in-memory when false (not durable)
+  dsn: "postgres://cbdc:cbdc@localhost:5432/cbdc?sslmode=disable"
+  max_open_conns: 25
+  max_idle_conns: 5
+  conn_max_lifetime: 30m
+
+log:
+  level: "info"
+  json: true
